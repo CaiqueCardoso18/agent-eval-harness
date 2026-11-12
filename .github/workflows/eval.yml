@@ -1,0 +1,36 @@
+name: tests and eval gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  eval-gate:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e .
+      - name: Run golden set (blocks below 90%)
+        working-directory: examples
+        run: evalkit run --agent toy_agent:agent --dataset golden.jsonl --judge keyword --min-pass-rate 0.9 --report report.md
+      - name: Publish report
+        if: always()
+        run: cat examples/report.md >> "$GITHUB_STEP_SUMMARY"
